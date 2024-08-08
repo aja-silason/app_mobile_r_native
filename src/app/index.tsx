@@ -1,23 +1,30 @@
-import { useState } from "react";
-import {Alert, Image, Keyboard, StyleSheet, Text, View} from "react-native";
-import {MapPin, Calendar as IconCalendar, Settings2, UserRoundPlus, ArrowRight, AtSign  } from "lucide-react-native";
-import dayjs from "dayjs";
+import { useEffect, useState } from "react"
+import { View, Text, Image, Keyboard, Alert, StyleSheet } from "react-native"
+import {
+  MapPin,
+  Calendar as IconCalendar,
+  Settings2,
+  UserRoundPlus,
+  ArrowRight,
+  AtSign,
+} from "lucide-react-native"
+import { DateData } from "react-native-calendars"
+import dayjs from "dayjs"
 
+import { tripStorage } from "@/storage/trip"
+import { tripServer } from "@/server/trip-server"
 
-import { tripStorage } from "@/storage/trip";
-import {calendarUtils, DatesSelected} from "@/utils/calendarUtils"
-import { validateInput } from "@/utils/validateInput";
-import { DateData } from "react-native-calendars";
+import { colors } from "@/styles/colors"
+import { validateInput } from "@/utils/validateInput"
+import { DatesSelected, calendarUtils } from "@/utils/calendarUtils"
 
-import { colors } from "@/styles/colors";
-
-import { Input } from "@/components/input";
-import { Button } from "@/components/button";
-import { Modal } from "@/components/modal";
-import { Calendar } from "@/components/calendar";
-import { GuestEmail } from "@/components/email";
-import { router } from "expo-router";
-import { tripServer } from "@/server/trip-server";
+import { Modal } from "@/components/modal"
+import { Input } from "@/components/input"
+import { Button } from "@/components/button"
+import { GuestEmail } from "@/components/email"
+import { Calendar } from "@/components/calendar"
+import { router } from "expo-router"
+import { Loading } from "@/components/loading"
 
 
 const styles = StyleSheet.create({
@@ -44,7 +51,7 @@ enum MODAL {
 export default function Index(){
 
     //Loading
-    const [isCreatingTrip, setIsCreateingTrip] = useState(false);
+    const [isCreatingTrip, setIsCreatingTrip] = useState(false);
 
     //DATA
     const [stepForm, setSepForm] = useState(StepForm.TRIP_DETAILS);
@@ -56,38 +63,46 @@ export default function Index(){
     //MODAL
     const [showModal, setShowModal] = useState(MODAL.NONE);
 
-    function handleNextStepForm(){
-        if(destination.trim().length === 0 || !selectedDates.startsAt || !selectedDates.endsAt) {
-            return Alert.alert("Detalhes da viagem", "Preencha todos as informações da viagem para seguir."); 
-        } 
-        if(destination.length < 4) {
-            return Alert.alert("Detalhes da viagem", "Destino deve pelo menos ter 4 caracteres."); 
-        } 
-
-        if(stepForm === StepForm.TRIP_DETAILS) {
-            return setSepForm(StepForm.ADD_EMAIL)
+    function handleNextStepForm() {
+        if (
+          destination.trim().length === 0 ||
+          !selectedDates.startsAt ||
+          !selectedDates.endsAt
+        ) {
+          return Alert.alert(
+            "Detalhes da viagem",
+            "Preencha todos as informações da viagem para seguir."
+          )
         }
-
-
-        CreateTrip
-
-        Alert.alert("Nova viagem", "Confirmar  viagem?", [
-            {
-                text: "Não",
-                style: "cancel",
-            },
-            {
-                text: "Sim",
-                onPress: () => CreateTrip(),
-            }
+    
+        if (destination.length < 4) {
+          return Alert.alert(
+            "Detalhes da viagem",
+            "O destino deve ter pelo menos 4 caracteres."
+          )
+        }
+    
+        if (stepForm === StepForm.TRIP_DETAILS) {
+          return setSepForm(StepForm.ADD_EMAIL)
+        }
+    
+        Alert.alert("Nova viagem", "Confirmar viagem?", [
+          {
+            text: "Não",
+            style: "cancel",
+          },
+          {
+            text: "Sim",
+            onPress: createTrip,
+          },
         ])
-    }
+      }
 
     function handleSelectedDate(selectedDay: DateData){
         const dates = calendarUtils.orderStartsAtAndEndsAt({
             startsAt: selectedDates.startsAt,
             endsAt: selectedDates.endsAt,
-            selectedDay
+            selectedDay,
         })
         setSelectedDates(dates)
     }
@@ -113,43 +128,41 @@ export default function Index(){
 
     }
 
-    async function saveTrip(tripId: any){
+    async function saveTrip(tripId: string) {
         try {
-            await tripStorage.save(tripId)
-            // router.navigate("/trip/" + tripId)
+          await tripStorage.save(tripId)
+          router.navigate("/trip/" + tripId)
         } catch (error) {
-            Alert.alert("Salvar viagem", "Não foi possível salvar o id da viagem no dispositivo");
-            console.log(error);
+          Alert.alert(
+            "Salvar viagem",
+            "Não foi possível salvar o id da viagem no dispositivo."
+          )
+          console.log(error)
         }
-    }
+      }
 
-    async function CreateTrip () {
-        console.log("Key");
+      async function createTrip() {
         try {
-            setIsCreateingTrip(true);
-
-            const newTrip = await tripServer.create({
-                destination,
-                starts_at: dayjs(selectedDates.startsAt?.dateString).toString(),
-                ends_at: dayjs(selectedDates.endsAt?.dateString).toString(),
-                email_to_invite: emailsToInvite, 
-            })
-
-            console.log("Opahh criou");
-            
-            Alert.alert("Nova viagem", "Viagem criada com sucesso", [
-                {
-                    text: "OK. continuar",
-                    onPress: () => saveTrip(newTrip.tripId),
-                },
-            ]);
-
+          setIsCreatingTrip(true)
+    
+          const newTrip = await tripServer.create({
+            destination,
+            starts_at: dayjs(selectedDates.startsAt?.dateString).toString(),
+            ends_at: dayjs(selectedDates.endsAt?.dateString).toString(),
+            emails_to_invite: emailsToInvite,
+          })
+    
+          Alert.alert("Nova viagem", "Viagem criada com sucesso!", [
+            {
+              text: "OK. Continuar.",
+              onPress: () => saveTrip(newTrip.tripId),
+            },
+          ])
         } catch (error) {
-            console.log(error);
-            setIsCreateingTrip(true);
-            console.log("Opahh erro");
+          console.log(error)
+          setIsCreatingTrip(false)
         }
-    }
+      }
     
     return (
         <View className="flex-1 items-center justify-center px-5">
